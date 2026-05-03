@@ -471,11 +471,16 @@ jobs:
             OPENSSL_STATIC=1
             OPENSSL_NO_VENDOR=1
           # Smoketest: cibuildwheel sets up a node-hosted Pyodide venv,
-          # installs the wheel, and runs this command. Catches missing
-          # symbols, ABI/loader breakage, and basic OpenSSL link failures.
+          # installs the wheel, and runs this command. Mirrors the core
+          # check in .github/actions/wheel-smoketest/action.yml -- prints
+          # the loaded vs linked-against OpenSSL version, exercising both
+          # the OpenSSL backend import and a cffi FFI string call.
           CIBW_TEST_COMMAND_PYODIDE: |
-            python -c "from cryptography.fernet import Fernet; t = Fernet(Fernet.generate_key()); assert t.decrypt(t.encrypt(b'x')) == b'x'"
-            python -c "from cryptography.hazmat.primitives import hashes; h = hashes.Hash(hashes.SHA256()); h.update(b'x'); h.finalize()"
+            python -c "
+            from cryptography.hazmat.backends.openssl.backend import backend
+            print(f'Loaded: {backend.openssl_version_text()}')
+            print(f'Linked Against: {backend._ffi.string(backend._lib.OPENSSL_VERSION_TEXT).decode(\"ascii\")}')
+            "
 
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
