@@ -388,10 +388,10 @@ jobs:
           name: "cryptography-${{ github.event.inputs.version }}-${{ matrix.WINDOWS.WINDOWS }}-${{ matrix.PYTHON.VERSION }}-${{ matrix.PYTHON.ABI_VERSION }}"
           path: wheelhouse\
 
-  pyodide:
+  pyemscripten:
     needs: [sdist]
     runs-on: ubuntu-latest
-    name: "cp313 pyodide_2025_0_wasm32"
+    name: "cp314 pyemscripten_2026_0_wasm32"
     steps:
       - name: Get build-requirements.txt from repository
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
@@ -406,7 +406,7 @@ jobs:
 
       - uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6.2.0
         with:
-          python-version: "3.13"
+          python-version: "3.14"
         timeout-minutes: 3
 
       - uses: dtolnay/rust-toolchain@e97e2d8cc328f1b50210efc529dca0028893a2d9
@@ -420,12 +420,16 @@ jobs:
         with:
           name: cryptography-sdist
 
-      - run: pip install cibuildwheel
+      # TODO: cibuildwheel main does not yet ship a cp314 pyodide/pyemscripten build
+      # identifier. Install from pypa/cibuildwheel#2812 which adds cp314-pyodide_wasm32 (Pyodide 314.0.0a1, pyodide-build 0.34.1)
+      # and emits the pyemscripten_2026_0_wasm32 platform tag.
+      # **Switch to a released cibuildwheel once #2812 is merged**
+      - run: pip install "cibuildwheel @ git+https://github.com/agriyakhetarpal/cibuildwheel.git@40ffec086b3068e0e4e2b86e9ef5ff6ff1156d9f"
       - run: mkdir wheelhouse
       - name: Build the wheel
-        # cibuildwheel's pyodide build identifier is cp313-pyodide_wasm32; the
-        # final wheel platform tag (pyodide_2025_0_wasm32) is set by
-        # pyodide-build via PYODIDE_ABI_VERSION on Pyodide 0.29.x.
+        # cibuildwheel's identifier is cp314-pyodide_wasm32; pyodide-build
+        # 0.34.1 emits the wheel with platform tag pyemscripten_2026_0_wasm32
+        # (PEP 783), which is what PyPI accepts.
         #
         # Pyodide does not expose a downstream-linkable OpenSSL (its _ssl is
         # baked into pyodide.asm.wasm), so we cross-compile OpenSSL ourselves
@@ -433,7 +437,10 @@ jobs:
         # activated emsdk, so emcc/emconfigure/emmake are on PATH.
         run: cibuildwheel --platform pyodide --output-dir wheelhouse/ cryptography*.tar.gz
         env:
-          CIBW_BUILD: "cp313-pyodide_wasm32"
+          CIBW_BUILD: "cp314-pyodide_wasm32"
+          # cp314-pyodide is gated behind the pyodide-prerelease enable group
+          # while Pyodide 314.0.0a1 is the only published 3.14 build.
+          CIBW_ENABLE: "pyodide-prerelease"
           OPENSSL_VERSION: "3.5.4"
           CIBW_BEFORE_BUILD_PYODIDE: |
             set -e
@@ -465,5 +472,5 @@ jobs:
 
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          name: "cryptography-${{ github.event.inputs.version }}-cp313-pyodide_2025_0_wasm32"
+          name: "cryptography-${{ github.event.inputs.version }}-cp314-pyemscripten_2026_0_wasm32"
           path: wheelhouse/
