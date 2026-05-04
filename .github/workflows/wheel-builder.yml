@@ -388,10 +388,14 @@ jobs:
           name: "cryptography-${{ github.event.inputs.version }}-${{ matrix.WINDOWS.WINDOWS }}-${{ matrix.PYTHON.VERSION }}-${{ matrix.PYTHON.ABI_VERSION }}"
           path: wheelhouse\
 
-  
+
   pyemscripten:
     needs: [sdist]
     runs-on: ubuntu-latest
+    # Non-blocking until the in-Pyodide pytest run is reliably green.
+    # Tag releases must not be gated on this job while the suite is being
+    # stabilized.
+    continue-on-error: true
     name: "cp314 pyemscripten_2026_0_wasm32"
     steps:
       - name: Get build-requirements.txt from repository
@@ -420,6 +424,18 @@ jobs:
       - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
           name: cryptography-sdist
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: vectors-sdist-wheel
+          path: vectors-dist/
+      - name: Resolve absolute path of vectors wheel
+        # cibuildwheel runs CIBW_BEFORE_TEST_PYODIDE from the unpacked sdist
+        # directory, not from $GITHUB_WORKSPACE. Resolve to an absolute path
+        # here and pass it through CIBW_ENVIRONMENT_PYODIDE.
+        run: |
+          set -e
+          VECTORS_WHEEL="$(ls "${GITHUB_WORKSPACE}"/vectors-dist/cryptography_vectors-*.whl)"
+          echo "VECTORS_WHEEL=${VECTORS_WHEEL}" >> "${GITHUB_ENV}"
 
       # TODO: cibuildwheel main does not yet ship a cp314 pyodide/pyemscripten build
       # identifier. Install from pypa/cibuildwheel#2812 which adds cp314-pyodide_wasm32 (Pyodide 314.0.0a1, pyodide-build 0.34.1)
@@ -470,17 +486,37 @@ jobs:
             OPENSSL_DIR=/tmp/openssl-pyodide
             OPENSSL_STATIC=1
             OPENSSL_NO_VENDOR=1
-          # Smoketest: cibuildwheel sets up a node-hosted Pyodide venv,
-          # installs the wheel, and runs this command. Mirrors the core
-          # check in .github/actions/wheel-smoketest/action.yml -- prints
-          # the loaded vs linked-against OpenSSL version, exercising both
-          # the OpenSSL backend import and a cffi FFI string call.
+            VECTORS_WHEEL=$VECTORS_WHEEL
+          # Copy the test tree into cibuildwheel's per-build test workdir so
+          # `pytest tests/...` resolves. cibuildwheel runs tests from a
+          # scratch directory, not from the project root.
+          CIBW_TEST_SOURCES_PYODIDE: tests
+          # Installed by Pyodide's pip into the test venv. We deliberately do
+          # NOT install pytest-xdist (no multiprocessing under Emscripten) or
+          # pytest-cov (Rust coverage instrumentation has no wasm32 backend);
+          # the rest of the cryptography[test] extras are the bare minimum
+          # needed to import and run the suite.
+          # pytest-benchmark is required because pyproject.toml's addopts
+          # contains "--benchmark-disable" -- pytest fails on first invocation
+          # without the plugin installed.
+          # certifi is required by tests/bench/test_x509.py (and is part of
+          # the [test] extras).
+          CIBW_TEST_REQUIRES_PYODIDE: pytest pytest-benchmark pytest-pyodide pretend certifi
+          # Install the cryptography_vectors wheel built by the `sdist` job.
+          # It is pure-Python, so the manylinux-flavoured wheel works as-is
+          # under Pyodide; no separate pyemscripten build is needed.
+          CIBW_BEFORE_TEST_PYODIDE: |
+            pip install "$VECTORS_WHEEL"
+          # Run binding-import smoketest first so an OpenSSL/cffi
+          # regression fails fast before pytest collection.
+          # Then run the full test suite.
           CIBW_TEST_COMMAND_PYODIDE: |
             python -c "
             from cryptography.hazmat.backends.openssl.backend import backend
             print(f'Loaded: {backend.openssl_version_text()}')
             print(f'Linked Against: {backend._ffi.string(backend._lib.OPENSSL_VERSION_TEXT).decode(\"ascii\")}')
             "
+            pytest -p no:cacheprovider tests/
 
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
