@@ -490,7 +490,10 @@ jobs:
           # Copy the test tree into cibuildwheel's per-build test workdir so
           # `pytest tests/...` resolves. cibuildwheel runs tests from a
           # scratch directory, not from the project root.
-          CIBW_TEST_SOURCES_PYODIDE: tests
+          # pyproject.toml is included so pytest finds [tool.pytest.ini_options]
+          # in its normal upward-walk discovery -- otherwise marker registrations
+          # are silently ignored
+          CIBW_TEST_SOURCES_PYODIDE: tests pyproject.toml
           # Installed by Pyodide's pip into the test venv. We deliberately do
           # NOT install:
           #   - pytest-xdist  (no multiprocessing under Emscripten)
