@@ -492,16 +492,22 @@ jobs:
           # scratch directory, not from the project root.
           CIBW_TEST_SOURCES_PYODIDE: tests
           # Installed by Pyodide's pip into the test venv. We deliberately do
-          # NOT install pytest-xdist (no multiprocessing under Emscripten) or
-          # pytest-cov (Rust coverage instrumentation has no wasm32 backend);
-          # the rest of the cryptography[test] extras are the bare minimum
-          # needed to import and run the suite.
+          # NOT install:
+          #   - pytest-xdist  (no multiprocessing under Emscripten)
+          #   - pytest-cov    (Rust coverage instrumentation has no wasm32 backend)
+          #   - pytest-pyodide  (it's a *host-side* plugin that drives Pyodide via
+          #                      Selenium/Playwright/Node from an outer pytest;
+          #                      installing it inside the Pyodide venv pulls in
+          #                      `playwright`, which has no wasm32 distribution
+          #                      and breaks pip resolution. cibuildwheel already
+          #                      hosts the Pyodide runtime here -- pytest just
+          #                      runs natively inside it.)
           # pytest-benchmark is required because pyproject.toml's addopts
           # contains "--benchmark-disable" -- pytest fails on first invocation
           # without the plugin installed.
           # certifi is required by tests/bench/test_x509.py (and is part of
           # the [test] extras).
-          CIBW_TEST_REQUIRES_PYODIDE: pytest pytest-benchmark pytest-pyodide pretend certifi
+          CIBW_TEST_REQUIRES_PYODIDE: pytest pytest-benchmark pretend certifi
           # Install the cryptography_vectors wheel built by the `sdist` job.
           # It is pure-Python, so the manylinux-flavoured wheel works as-is
           # under Pyodide; no separate pyemscripten build is needed.
