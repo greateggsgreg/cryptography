@@ -388,27 +388,13 @@ jobs:
           name: "cryptography-${{ github.event.inputs.version }}-${{ matrix.WINDOWS.WINDOWS }}-${{ matrix.PYTHON.VERSION }}-${{ matrix.PYTHON.ABI_VERSION }}"
           path: wheelhouse\
 
-
   pyemscripten:
     needs: [sdist]
     runs-on: ubuntu-latest
-    # Non-blocking until the in-Pyodide pytest run is reliably green.
-    # Tag releases must not be gated on this job while the suite is being
-    # stabilized.
-    continue-on-error: true
     name: "cp314 pyemscripten_2026_0_wasm32"
     steps:
-      - name: Get build-requirements.txt from repository
-        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
-        with:
-          # The tag to build or the tag received by the tag event
-          ref: ${{ github.event.inputs.version || github.ref }}
-          persist-credentials: false
-          sparse-checkout: |
-            ${{ env.BUILD_REQUIREMENTS_PATH }}
-            ${{ env.UV_REQUIREMENTS_PATH }}
-          sparse-checkout-cone-mode: false
-
+      # No actions/checkout: this job builds the wheel from the sdist
+      # artifact, so it never reads any files from the repository tree.
       - uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6.2.0
         with:
           python-version: "3.14"
@@ -424,18 +410,6 @@ jobs:
       - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
           name: cryptography-sdist
-      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
-        with:
-          name: vectors-sdist-wheel
-          path: vectors-dist/
-      - name: Resolve absolute path of vectors wheel
-        # cibuildwheel runs CIBW_BEFORE_TEST_PYODIDE from the unpacked sdist
-        # directory, not from $GITHUB_WORKSPACE. Resolve to an absolute path
-        # here and pass it through CIBW_ENVIRONMENT_PYODIDE.
-        run: |
-          set -e
-          VECTORS_WHEEL="$(ls "${GITHUB_WORKSPACE}"/vectors-dist/cryptography_vectors-*.whl)"
-          echo "VECTORS_WHEEL=${VECTORS_WHEEL}" >> "${GITHUB_ENV}"
 
       # TODO: cibuildwheel main does not yet ship a cp314 pyodide/pyemscripten build
       # identifier. Install from pypa/cibuildwheel#2812 which adds cp314-pyodide_wasm32 (Pyodide 314.0.0a1, pyodide-build 0.34.1)
@@ -458,7 +432,7 @@ jobs:
           # cp314-pyodide is gated behind the pyodide-prerelease enable group
           # while Pyodide 314.0.0a1 is the only published 3.14 build.
           CIBW_ENABLE: "pyodide-prerelease"
-          OPENSSL_VERSION: "3.5.4"
+          OPENSSL_VERSION: "3.6.2"
           CIBW_BEFORE_BUILD_PYODIDE: |
             set -e
             if [ ! -f /tmp/openssl-pyodide/lib/libssl.a ]; then
@@ -486,46 +460,18 @@ jobs:
             OPENSSL_DIR=/tmp/openssl-pyodide
             OPENSSL_STATIC=1
             OPENSSL_NO_VENDOR=1
-            VECTORS_WHEEL=$VECTORS_WHEEL
-          # Copy the test tree into cibuildwheel's per-build test workdir so
-          # `pytest tests/...` resolves. cibuildwheel runs tests from a
-          # scratch directory, not from the project root.
-          # pyproject.toml is included so pytest finds [tool.pytest.ini_options]
-          # in its normal upward-walk discovery -- otherwise marker registrations
-          # are silently ignored
-          CIBW_TEST_SOURCES_PYODIDE: tests pyproject.toml
-          # Installed by Pyodide's pip into the test venv. We deliberately do
-          # NOT install:
-          #   - pytest-xdist  (no multiprocessing under Emscripten)
-          #   - pytest-cov    (Rust coverage instrumentation has no wasm32 backend)
-          #   - pytest-pyodide  (it's a *host-side* plugin that drives Pyodide via
-          #                      Selenium/Playwright/Node from an outer pytest;
-          #                      installing it inside the Pyodide venv pulls in
-          #                      `playwright`, which has no wasm32 distribution
-          #                      and breaks pip resolution. cibuildwheel already
-          #                      hosts the Pyodide runtime here -- pytest just
-          #                      runs natively inside it.)
-          # pytest-benchmark is required because pyproject.toml's addopts
-          # contains "--benchmark-disable" -- pytest fails on first invocation
-          # without the plugin installed.
-          # certifi is required by tests/bench/test_x509.py (and is part of
-          # the [test] extras).
-          CIBW_TEST_REQUIRES_PYODIDE: pytest pytest-benchmark pretend certifi
-          # Install the cryptography_vectors wheel built by the `sdist` job.
-          # It is pure-Python, so the manylinux-flavoured wheel works as-is
-          # under Pyodide; no separate pyemscripten build is needed.
-          CIBW_BEFORE_TEST_PYODIDE: |
-            pip install "$VECTORS_WHEEL"
-          # Run binding-import smoketest first so an OpenSSL/cffi
-          # regression fails fast before pytest collection.
-          # Then run the full test suite.
+          # Smoketest only -- mirrors the binding-import check that the other
+          # platform jobs (manylinux/macOS/Windows) run via
+          # .github/actions/wheel-smoketest. The full pytest suite for
+          # pyemscripten lives in ci.yml under the `pyemscripten` job, which
+          # runs on every PR (this wheel-builder job only fires on tag pushes
+          # and path-restricted PRs).
           CIBW_TEST_COMMAND_PYODIDE: |
             python -c "
             from cryptography.hazmat.backends.openssl.backend import backend
             print(f'Loaded: {backend.openssl_version_text()}')
             print(f'Linked Against: {backend._ffi.string(backend._lib.OPENSSL_VERSION_TEXT).decode(\"ascii\")}')
             "
-            pytest -p no:cacheprovider tests/
 
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
