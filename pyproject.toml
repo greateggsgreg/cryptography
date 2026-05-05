@@ -180,6 +180,8 @@ exclude_lines = [
     "@abc.abstractmethod",
     "@typing.overload",
     "if typing.TYPE_CHECKING",
+    # coverage lacks Rust wasm backend
+    'if sys.platform == "emscripten":'
 ]
 
 [tool.ruff]
