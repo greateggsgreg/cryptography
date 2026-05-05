@@ -406,6 +406,7 @@ jobs:
         with:
           # Pyodide's emscripten build passes nightly-only `-Z` flags
           # (link-native-libraries, emscripten-wasm-eh).
+          # TODO: This should be switched to stable by the time pyodide 314.0 is released.
           toolchain: nightly
           target: wasm32-unknown-emscripten
 
