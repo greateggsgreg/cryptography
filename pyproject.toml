@@ -15,7 +15,7 @@ build-backend = "maturin"
 
 [project]
 name = "cryptography"
-version = "48.0.0.dev1"
+version = "49.0.0.dev1"
 authors = [
     { name = "The Python Cryptographic Authority and individual contributors", email = "cryptography-dev@python.org" },
 ]
@@ -201,4 +201,6 @@ git-only = [
     "ci-constraints-requirements.txt",
     ".gitattributes",
     ".gitignore",
+    "AGENTS.md",
+    "CLAUDE.md",
 ]
