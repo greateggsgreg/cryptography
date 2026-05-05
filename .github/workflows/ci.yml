@@ -405,8 +405,21 @@ jobs:
 
   pyemscripten:
     runs-on: ubuntu-latest
-    name: "pyemscripten (cp314-abi3-pyemscripten_2026_0_wasm32)"
     timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        PYODIDE:
+          - VERSION: "314.0.0a1"
+            EMSDK: "5.0.3"
+            PYTHON: "3.14"
+    name: "pyemscripten (Pyodide ${{ matrix.PYODIDE.VERSION }})"
+    env:
+      # Pyodide pins emscripten in xbuildenv/Makefile.envs.
+      PYODIDE_VERSION: ${{ matrix.PYODIDE.VERSION }}
+      EMSDK_VERSION: ${{ matrix.PYODIDE.EMSDK }}
+      # Must stay in lockstep with wheel-builder.yml::pyemscripten.
+      OPENSSL_VERSION: "3.6.2"
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         timeout-minutes: 3
@@ -416,7 +429,7 @@ jobs:
       - name: Setup python
         uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6.2.0
         with:
-          python-version: "3.14"
+          python-version: ${{ matrix.PYODIDE.PYTHON }}
         timeout-minutes: 3
 
       - uses: dtolnay/rust-toolchain@e97e2d8cc328f1b50210efc529dca0028893a2d9
@@ -426,51 +439,63 @@ jobs:
           toolchain: nightly
           target: wasm32-unknown-emscripten
 
+      - name: Cache Rust artifacts (wasm32-emscripten)
+        uses: ./.github/actions/cache
+        timeout-minutes: 2
+        with:
+          key: pyemscripten-${{ env.PYODIDE_VERSION }}-${{ env.EMSDK_VERSION }}-${{ env.OPENSSL_VERSION }}
+
       - name: Clone test vectors
         timeout-minutes: 2
         uses: ./.github/actions/fetch-vectors
 
       - name: Install pyodide-build
-        # [resolve] extra pulls in resolvelib + unearth, required by
+        # `[resolve]` extra pulls in resolvelib + unearth, required by
         # `pyodide build`.
         run: python -m pip install "pyodide-build[resolve]"
 
       - name: Install Pyodide xbuildenv (cross-build artifacts + patches)
         run: pyodide xbuildenv install
 
-      - name: Install emsdk 5.0.3 (Pyodide-pinned)
-        # Pyodide 314.0.0a1 pins emscripten 5.0.3 in xbuildenv/Makefile.envs.
-        # The xbuildenv ships only patches, not emsdk binaries -- we install
-        # them ourselves natively for the runner's architecture.
+      - name: Cache emsdk install
+        id: emsdk-cache
+        uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
+        timeout-minutes: 2
+        with:
+          path: /opt/emsdk
+          key: emsdk-${{ env.PYODIDE_VERSION }}-${{ env.EMSDK_VERSION }}-${{ runner.os }}-${{ runner.arch }}-0
+
+      - name: Install emsdk (Pyodide-pinned)
+        # Pyodide's xbuildenv ships only patches, not emsdk binaries.
+        if: steps.emsdk-cache.outputs.cache-hit != 'true'
         run: |
           set -e
           git clone --depth 1 https://github.com/emscripten-core/emsdk.git /opt/emsdk
           cd /opt/emsdk
-          ./emsdk install 5.0.3
-          ./emsdk activate 5.0.3
+          ./emsdk install "${EMSDK_VERSION}"
+          ./emsdk activate "${EMSDK_VERSION}"
+
+      - name: Cache cross-compiled OpenSSL
+        id: openssl-pyodide-cache
+        uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
+        timeout-minutes: 2
+        with:
+          path: /tmp/openssl-pyodide
+          key: openssl-pyodide-${{ env.PYODIDE_VERSION }}-${{ env.OPENSSL_VERSION }}-emscripten-${{ env.EMSDK_VERSION }}-${{ hashFiles('.github/bin/build_openssl.sh') }}-${{ runner.os }}-${{ runner.arch }}-0
 
       - name: Cross-compile OpenSSL for wasm32-emscripten
-        # Mirrors the OpenSSL build in
-        # .github/workflows/wheel-builder.yml::pyemscripten so the wheel
-        # tested here is built the same way as the published wheel.
+        # Pyodide does not expose a downstream-linkable OpenSSL (its `_ssl`
+        # module is baked into pyodide.asm.wasm), so we cross-compile our own.
+        if: steps.openssl-pyodide-cache.outputs.cache-hit != 'true'
+        env:
+          TYPE: pyemscripten
+          VERSION: ${{ env.OPENSSL_VERSION }}
+          OSSL_PATH: /tmp/openssl-pyodide
         run: |
           set -e
           # shellcheck disable=SC1091
           source /opt/emsdk/emsdk_env.sh
-          OPENSSL_VERSION=3.6.2
-          mkdir -p /tmp/openssl-build
-          cd /tmp/openssl-build
-          curl -fsSL "https://github.com/openssl/openssl/releases/download/openssl-${OPENSSL_VERSION}/openssl-${OPENSSL_VERSION}.tar.gz" -o openssl.tar.gz
-          tar xzf openssl.tar.gz
-          cd "openssl-${OPENSSL_VERSION}"
-          emconfigure ./Configure linux-generic32 \
-            no-shared no-asm no-engine no-dso no-tests no-srtp no-cms \
-            no-ui-console no-threads \
-            --cross-compile-prefix= \
-            CC=emcc AR=emar RANLIB=emranlib \
-            --prefix=/tmp/openssl-pyodide
-          emmake make -j"$(nproc)" build_libs
-          emmake make install_dev
+          bash .github/bin/build_openssl.sh
 
       - name: Build cryptography_vectors wheel
         run: |
@@ -486,7 +511,7 @@ jobs:
           export OPENSSL_STATIC=1
           export OPENSSL_NO_VENDOR=1
           mkdir -p wheelhouse
-          # pyodide build ignores --output-dir in 0.34.x and writes to ./dist/.
+          # pyodide-build 0.34.x ignores --output-dir and writes to ./dist/.
           pyodide build .
           cp dist/cryptography-*pyemscripten*.whl wheelhouse/
 
@@ -496,13 +521,14 @@ jobs:
           pyodide venv .venv-pyodide
           # shellcheck disable=SC1091
           source .venv-pyodide/bin/activate
-          # See wheel-builder.yml for the rationale on why pytest-xdist /
-          # pytest-cov / pytest-pyodide are deliberately omitted.
-          # pytest-benchmark is required because pyproject.toml addopts uses
-          # --benchmark-disable; certifi is needed by tests/bench/test_x509.py.
-          # bcrypt is an optional [test] extra; Pyodide ships a pre-built
-          # cp314-cp314-pyemscripten_2026_0_wasm32 wheel that unblocks the
-          # tests/hazmat/primitives/test_ssh.py bcrypt-gated test cases.
+          # pytest-xdist (no multiprocessing under Emscripten), pytest-cov
+          # (no Rust wasm coverage backend), and pytest-pyodide (host-side
+          # plugin; pulls playwright which has no wasm32 distribution) are
+          # deliberately omitted. pytest-benchmark satisfies pyproject.toml's
+          # --benchmark-disable addopt; certifi is needed by
+          # tests/bench/test_x509.py; bcrypt unblocks the bcrypt-gated cases
+          # in tests/hazmat/primitives/test_ssh.py (Pyodide ships a wasm
+          # wheel for it).
           pip install pytest pytest-benchmark pretend certifi bcrypt
           pip install vectors/dist/cryptography_vectors-*.whl
           pip install wheelhouse/cryptography-*.whl
@@ -517,9 +543,6 @@ jobs:
           set -e
           # shellcheck disable=SC1091
           source .venv-pyodide/bin/activate
-          # Mirrors ci.yml linux: --wycheproof-root + --x509-limbo-root from
-          # the fetch-vectors action. pytest-xdist intentionally omitted (no
-          # multiprocessing under Emscripten/Pyodide).
           pytest -p no:cacheprovider \
             --wycheproof-root=wycheproof \
             --x509-limbo-root=x509-limbo \
