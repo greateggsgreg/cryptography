@@ -172,6 +172,8 @@ source = [
     "*.nox/*/lib*/python*/site-packages/cryptography",
     "*.nox\\*\\Lib\\site-packages\\cryptography",
     "*.nox/pypy/site-packages/cryptography",
+    # Pyodide-built wheel installed into the pyemscripten job's venv.
+    "*.venv-pyodide/lib*/python*/site-packages/cryptography",
 ]
 tests = ["tests/", "*tests\\"]
 
@@ -180,8 +182,6 @@ exclude_lines = [
     "@abc.abstractmethod",
     "@typing.overload",
     "if typing.TYPE_CHECKING",
-    # coverage lacks Rust wasm backend
-    'if sys.platform == "emscripten":'
 ]
 
 [tool.ruff]

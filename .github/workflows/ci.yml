@@ -453,23 +453,9 @@ jobs:
       - name: Install Pyodide xbuildenv (cross-build artifacts + patches)
         run: pyodide xbuildenv install
 
-      - name: Cache emsdk install
-        id: emsdk-cache
-        uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
-        timeout-minutes: 2
-        with:
-          path: /opt/emsdk
-          key: emsdk-${{ env.PYODIDE_VERSION }}-${{ env.EMSDK_VERSION }}-${{ runner.os }}-${{ runner.arch }}-0
-
-      - name: Install emsdk (Pyodide-pinned)
-        # Pyodide's xbuildenv ships only patches, not emsdk binaries.
-        if: steps.emsdk-cache.outputs.cache-hit != 'true'
-        run: |
-          set -e
-          git clone --depth 1 https://github.com/emscripten-core/emsdk.git /opt/emsdk
-          cd /opt/emsdk
-          ./emsdk install "${EMSDK_VERSION}"
-          ./emsdk activate "${EMSDK_VERSION}"
+      - name: Install Pyodide-pinned Emscripten SDK
+        # Pyodide patches emscripten; vanilla emsdk produces broken wheels.
+        run: pyodide xbuildenv install-emscripten
 
       - name: Cache cross-compiled OpenSSL
         id: openssl-pyodide-cache
@@ -490,7 +476,7 @@ jobs:
         run: |
           set -e
           # shellcheck disable=SC1091
-          source /opt/emsdk/emsdk_env.sh
+          source "$(pyodide config get emsdk_dir)/emsdk_env.sh"
           bash .github/bin/build_openssl.sh
 
       - name: Build cryptography_vectors wheel
@@ -502,7 +488,7 @@ jobs:
         run: |
           set -e
           # shellcheck disable=SC1091
-          source /opt/emsdk/emsdk_env.sh
+          source "$(pyodide config get emsdk_dir)/emsdk_env.sh"
           export OPENSSL_DIR=/tmp/openssl-pyodide
           export OPENSSL_STATIC=1
           export OPENSSL_NO_VENDOR=1
@@ -517,12 +503,11 @@ jobs:
           pyodide venv .venv-pyodide
           # shellcheck disable=SC1091
           source .venv-pyodide/bin/activate
-          # pytest-xdist (no multiprocessing under Emscripten) is deliberately omitted.
-          # pytest-benchmark satisfies pyproject.toml's --benchmark-disable addopt;
+          # pytest-xdist omitted: no multiprocessing under Emscripten.
+          # pytest-benchmark satisfies the --benchmark-disable addopt;
           # certifi is needed by tests/bench/test_x509.py;
-          # bcrypt unblocks the bcrypt-gated cases in tests/hazmat/primitives/test_ssh.py (Pyodide ships a wasm
-          # wheel for it).
-          pip install pytest pytest-benchmark pretend certifi bcrypt
+          # bcrypt unblocks bcrypt-gated cases in test_ssh.py.
+          pip install pytest pytest-cov pytest-benchmark pretend certifi bcrypt
           pip install vectors/dist/cryptography_vectors-*.whl
           pip install wheelhouse/cryptography-*.whl
           python -c "
@@ -537,9 +522,12 @@ jobs:
           # shellcheck disable=SC1091
           source .venv-pyodide/bin/activate
           pytest -p no:cacheprovider \
+            --cov=cryptography --cov=tests \
             --wycheproof-root=wycheproof \
             --x509-limbo-root=x509-limbo \
             tests/
+
+      - uses: ./.github/actions/upload-coverage
 
   linux-downstream:
     runs-on: ubuntu-latest

@@ -1,22 +1,8 @@
 #!/bin/bash
-#
-# Build a TLS library for use by cryptography's CI / wheel jobs.
-#
-# Required env vars (all branches):
-#   TYPE      - one of: openssl, libressl, boringssl, aws-lc, pyemscripten
-#   VERSION   - release version (TLS-impl branches) or git ref (e.g. boringssl)
-#   OSSL_PATH - absolute install prefix
-#
-# Per-TYPE extras:
-#   openssl       - CONFIG_FLAGS  : extra flags for ./config
-#   pyemscripten  - emsdk must be activated on PATH (emcc, emconfigure,
-#                   emmake). Cross-compiles OpenSSL VERSION for
-#                   wasm32-emscripten. Idempotent: if libssl.a is already
-#                   present at OSSL_PATH (e.g. restored from actions/cache)
-#                   the build is skipped. Pyodide does not expose a
-#                   downstream-linkable OpenSSL (its `_ssl` module is baked
-#                   into pyodide.asm.wasm) so the cryptography wheel must
-#                   link against its own.
+# Env: TYPE={openssl,libressl,boringssl,aws-lc,pyemscripten}, VERSION, OSSL_PATH.
+# openssl honours CONFIG_FLAGS. pyemscripten needs emsdk on PATH and links a
+# private OpenSSL into the wheel because Pyodide's _ssl is baked into
+# pyodide.asm.wasm with no exported symbols.
 
 set -e
 set -x
