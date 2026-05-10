@@ -517,13 +517,10 @@ jobs:
           pyodide venv .venv-pyodide
           # shellcheck disable=SC1091
           source .venv-pyodide/bin/activate
-          # pytest-xdist (no multiprocessing under Emscripten), pytest-cov
-          # (no Rust wasm coverage backend), and pytest-pyodide (host-side
-          # plugin; pulls playwright which has no wasm32 distribution) are
-          # deliberately omitted. pytest-benchmark satisfies pyproject.toml's
-          # --benchmark-disable addopt; certifi is needed by
-          # tests/bench/test_x509.py; bcrypt unblocks the bcrypt-gated cases
-          # in tests/hazmat/primitives/test_ssh.py (Pyodide ships a wasm
+          # pytest-xdist (no multiprocessing under Emscripten) is deliberately omitted.
+          # pytest-benchmark satisfies pyproject.toml's --benchmark-disable addopt;
+          # certifi is needed by tests/bench/test_x509.py;
+          # bcrypt unblocks the bcrypt-gated cases in tests/hazmat/primitives/test_ssh.py (Pyodide ships a wasm
           # wheel for it).
           pip install pytest pytest-benchmark pretend certifi bcrypt
           pip install vectors/dist/cryptography_vectors-*.whl
