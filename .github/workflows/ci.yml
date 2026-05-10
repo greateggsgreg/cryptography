@@ -516,16 +516,23 @@ jobs:
           print(f'Linked Against: {backend._ffi.string(backend._lib.OPENSSL_VERSION_TEXT).decode(\"ascii\")}')
           "
 
-      - name: Run tests
+      - name: Tests
+        # Mirrors noxfile.py::tests, minus xdist (no multiprocessing under
+        # Emscripten). Other platforms reach pytest via `nox --no-install`;
+        # pyodide can't (uv has no wasm build), so we call pytest directly.
         run: |
           set -e
           # shellcheck disable=SC1091
           source .venv-pyodide/bin/activate
           pytest -p no:cacheprovider \
             --cov=cryptography --cov=tests \
+            --durations=10 \
+            --color=yes \
             --wycheproof-root=wycheproof \
             --x509-limbo-root=x509-limbo \
             tests/
+        env:
+          COLUMNS: 80
 
       - uses: ./.github/actions/upload-coverage
 
