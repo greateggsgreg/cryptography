@@ -414,10 +414,9 @@ jobs:
         with:
           name: cryptography-sdist
 
-      # TODO: switch to released cibuildwheel once pypa/cibuildwheel#2812
-      # (which adds cp314-pyodide_wasm32 / pyemscripten_2026_0_wasm32) ships
-      # in a tagged release.
-      - run: pip install "cibuildwheel @ git+https://github.com/pypa/cibuildwheel.git@main"
+      # 4.0.0rc1 is the first tagged release with pyemscripten support
+      # (pypa/cibuildwheel#2812). Bump to 4.0.0 stable once it ships.
+      - run: pip install "cibuildwheel==4.0.0rc1"
       - run: mkdir wheelhouse
 
       - name: Cache cross-compiled OpenSSL
