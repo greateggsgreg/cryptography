@@ -40,18 +40,18 @@ jobs:
           - {VERSION: "3.14", NOXSESSION: "tests-ssh", OPENSSL: {TYPE: "openssl", VERSION: "3.6.2"}}
           - {VERSION: "3.14", NOXSESSION: "rust,tests", OPENSSL: {TYPE: "libressl", VERSION: "4.2.1"}}
           - {VERSION: "3.14", NOXSESSION: "rust,tests", OPENSSL: {TYPE: "libressl", VERSION: "4.3.1"}}
-          # Latest commit on the BoringSSL main branch, as of May 09, 2026.
-          - {VERSION: "3.14", NOXSESSION: "rust,tests", OPENSSL: {TYPE: "boringssl", VERSION: "d589045a772678d5ca131f4c8087d001b9258380"}}
+          # Latest commit on the BoringSSL main branch, as of May 15, 2026.
+          - {VERSION: "3.14", NOXSESSION: "rust,tests", OPENSSL: {TYPE: "boringssl", VERSION: "7fef640699de939dec3685475b21bce866b7e58d"}}
           # Latest tag of AWS-LC main branch, as of May 09, 2026.
           - {VERSION: "3.14", NOXSESSION: "rust,tests", OPENSSL: {TYPE: "aws-lc", VERSION: "v1.73.0"}}
-          # Latest commit on the OpenSSL master branch, as of May 10, 2026.
-          - {VERSION: "3.14", NOXSESSION: "tests", OPENSSL: {TYPE: "openssl", VERSION: "4124d150697e7e4114015c2b35b2323be0b2bc89"}}
+          # Latest commit on the OpenSSL master branch, as of May 14, 2026.
+          - {VERSION: "3.14", NOXSESSION: "tests", OPENSSL: {TYPE: "openssl", VERSION: "012cc567d00ab6e899cf3dc7c2845ec4cd68c1ff"}}
           # Builds with various Rust versions. Includes MSRV and next
           # potential future MSRV.
           # - 1.95: cfg_select
           - {VERSION: "3.14", NOXSESSION: "rust,tests", RUST: "1.83.0"}
           - {VERSION: "3.14", NOXSESSION: "rust,tests", RUST: "1.83.0", OPENSSL: {TYPE: "aws-lc", VERSION: "v1.73.0"}}
-          - {VERSION: "3.14", NOXSESSION: "rust,tests", RUST: "1.83.0", OPENSSL: {TYPE: "boringssl", VERSION: "d589045a772678d5ca131f4c8087d001b9258380"}}
+          - {VERSION: "3.14", NOXSESSION: "rust,tests", RUST: "1.83.0", OPENSSL: {TYPE: "boringssl", VERSION: "7fef640699de939dec3685475b21bce866b7e58d"}}
           - {VERSION: "3.14", NOXSESSION: "rust,tests", RUST: "beta"}
           - {VERSION: "3.14", NOXSESSION: "rust,tests", RUST: "nightly"}
           - {VERSION: "3.14", NOXSESSION: "tests-rust-debug"}
@@ -544,8 +544,8 @@ jobs:
         include:
           - DOWNSTREAM: paramiko
             REPO: paramiko/paramiko
-            # Latest commit on the paramiko main branch, as of Oct 20, 2025.
-            REF: 8697158113a3eab25ed1d1d541ebe2cad10169a7
+            # Latest commit on the paramiko main branch, as of May 10, 2026.
+            REF: d60d5c17d78f344b51ed651e796d2931133a9b22
             PATH: paramiko
           - DOWNSTREAM: pyopenssl
             REPO: pyca/pyopenssl
@@ -559,8 +559,8 @@ jobs:
             PATH: pyopenssl
           - DOWNSTREAM: twisted
             REPO: twisted/twisted
-            # Latest commit on the twisted trunk branch, as of Apr 30, 2026.
-            REF: 2d196123264efb0027eecfe1b430be4a9babdbd8
+            # Latest commit on the twisted trunk branch, as of May 12, 2026.
+            REF: 75facb285e48ead8ab9b6a21310454783d3f14df
             PATH: twisted
           - DOWNSTREAM: aws-encryption-sdk-python
             REPO: awslabs/aws-encryption-sdk-python
@@ -574,28 +574,28 @@ jobs:
             PATH: aws-dynamodb-encryption-python
           - DOWNSTREAM: certbot
             REPO: certbot/certbot
-            # Latest commit on the certbot main branch, as of May 09, 2026.
-            REF: 9339d23aa11d63baf3ce632945082555635d0df3
+            # Latest commit on the certbot main branch, as of May 12, 2026.
+            REF: 43f78f9c3cb8d6ac3aabc27210e96f7e5b0cbe78
             PATH: certbot
           - DOWNSTREAM: certbot-josepy
             REPO: certbot/josepy
-            # Latest commit on the certbot-josepy main branch, as of May 09, 2026.
-            REF: 353677c412248289ecc335231ef1f96916c05c13
+            # Latest commit on the certbot-josepy main branch, as of May 12, 2026.
+            REF: 83425fe014d372377b0e39549d8c03deeefcbb51
             PATH: josepy
           - DOWNSTREAM: mitmproxy
             REPO: mitmproxy/mitmproxy
-            # Latest commit on the mitmproxy main branch, as of Apr 29, 2026.
-            REF: ab470e5397d8cb73b3c44b9ee75834e6cda83ae7
+            # Latest commit on the mitmproxy main branch, as of May 15, 2026.
+            REF: a4518ab9ebbd642b36f4fbd8e6515f206c7a5af1
             PATH: mitmproxy
           - DOWNSTREAM: scapy
             REPO: secdev/scapy
-            # Latest commit on the scapy master branch, as of May 02, 2026.
-            REF: 8c5a9a8f76a771518caac7aa74b5b94e887c24b8
+            # Latest commit on the scapy master branch, as of May 10, 2026.
+            REF: 1abd9dd40968863e87aefdfbd24bef740919047d
             PATH: scapy
           - DOWNSTREAM: sigstore-python
             REPO: sigstore/sigstore-python
-            # Latest commit on the sigstore-python main branch, as of Apr 29, 2026.
-            REF: ec6e833ee36805ac4fde4f5252cc1d96acb944f5
+            # Latest commit on the sigstore-python main branch, as of May 15, 2026.
+            REF: cf6200d3f92ae651ddf9066e0d93202cc4c42f59
             PATH: sigstore-python
     name: "Downstream tests for ${{ matrix.DOWNSTREAM }}"
     timeout-minutes: 15
